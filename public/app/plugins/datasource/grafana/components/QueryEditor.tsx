@@ -16,8 +16,6 @@ import { SearchQuery } from 'app/features/search/service';
 import { GrafanaDatasource } from '../datasource';
 import { defaultQuery, GrafanaQuery, GrafanaQueryType } from '../types';
 
-import SearchEditor from './SearchEditor';
-
 type Props = QueryEditorProps<GrafanaDatasource, GrafanaQuery>;
 
 const labelWidth = 12;
@@ -33,19 +31,9 @@ export class QueryEditor extends PureComponent<Props, State> {
 
   queryTypes: Array<SelectableValue<GrafanaQueryType>> = [
     {
-      label: 'Random Walk',
-      value: GrafanaQueryType.RandomWalk,
-      description: 'Random signal within the selected time range',
-    },
-    {
       label: 'Live Measurements',
       value: GrafanaQueryType.LiveMeasurements,
       description: 'Stream real-time measurements from Grafana',
-    },
-    {
-      label: 'List public files',
-      value: GrafanaQueryType.List,
-      description: 'Show directory listings for public resources',
     },
   ];
 
@@ -380,10 +368,6 @@ export class QueryEditor extends PureComponent<Props, State> {
           </InlineField>
         </InlineFieldRow>
         {queryType === GrafanaQueryType.LiveMeasurements && this.renderMeasurementsQuery()}
-        {queryType === GrafanaQueryType.List && this.renderListPublicFiles()}
-        {queryType === GrafanaQueryType.Search && (
-          <SearchEditor value={query.search ?? {}} onChange={this.onSearchChange} />
-        )}
       </>
     );
   }

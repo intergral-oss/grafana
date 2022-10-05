@@ -46,7 +46,6 @@ const (
 	Dev              = "development"
 	Prod             = "production"
 	Test             = "test"
-	ApplicationName  = "Grafana"
 )
 
 // zoneInfo names environment variable for setting the path to look for the timezone database in go
@@ -61,11 +60,12 @@ var (
 	InstanceName     string
 
 	// build
-	BuildVersion string
-	BuildCommit  string
-	BuildBranch  string
-	BuildStamp   int64
-	IsEnterprise bool
+	BuildVersion    string
+	BuildCommit     string
+	BuildBranch     string
+	BuildStamp      int64
+	IsEnterprise    bool
+	ApplicationName string
 
 	// packaging
 	Packaging = "unknown"

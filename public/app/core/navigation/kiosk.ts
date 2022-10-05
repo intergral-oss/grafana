@@ -1,25 +1,25 @@
-import { t } from '@lingui/macro';
-
-import { AppEvents } from '@grafana/data';
+// import {t} from '@lingui/macro';
+//
+// import {AppEvents} from '@grafana/data';
 import { locationService } from '@grafana/runtime';
 
 import { KioskMode } from '../../types';
-import appEvents from '../app_events';
+// import appEvents from '../app_events';
 
 export function toggleKioskMode() {
   let kiosk = locationService.getSearchObject().kiosk;
 
   switch (kiosk) {
     case 'tv':
-      kiosk = true;
-      appEvents.emit(AppEvents.alertSuccess, [
-        t({ id: 'navigation.kiosk.tv-alert', message: 'Press ESC to exit Kiosk mode' }),
-      ]);
-      break;
-    case '1':
-    case true:
-      kiosk = null;
-      break;
+    //   kiosk = 'tv';
+    //   // appEvents.emit(AppEvents.alertSuccess, [
+    //   //   t({ id: 'navigation.kiosk.tv-alert', message: 'Press ESC to exit Kiosk mode' }),
+    //   // ]);
+    //   break;
+    // case '1':
+    // case true:
+    //   kiosk = 'tv';
+    //   break;
     default:
       kiosk = 'tv';
   }
@@ -35,10 +35,13 @@ export function getKioskMode(): KioskMode {
       return KioskMode.TV;
     //  legacy support
     case '1':
+    case 'full':
     case true:
-      return KioskMode.Full;
+      return KioskMode.TV;
+    case 'embed':
+      return KioskMode.TV;
     default:
-      return KioskMode.Off;
+      return KioskMode.TV;
   }
 }
 
