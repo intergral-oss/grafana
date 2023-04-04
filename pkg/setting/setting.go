@@ -47,7 +47,6 @@ const (
 	Dev              = "development"
 	Prod             = "production"
 	Test             = "test"
-	ApplicationName  = "Grafana"
 )
 
 // zoneInfo names environment variable for setting the path to look for the timezone database in go
@@ -67,6 +66,7 @@ var (
 	BuildBranch  string
 	BuildStamp   int64
 	IsEnterprise bool
+	ApplicationName string
 
 	// packaging
 	Packaging = "unknown"
@@ -161,6 +161,9 @@ var (
 
 	// Explore UI
 	ExploreEnabled bool
+
+	//kiosk mode
+	KioskMode string
 
 	// Help UI
 	HelpEnabled bool
@@ -1060,6 +1063,9 @@ func (cfg *Cfg) Load(args CommandLineArgs) error {
 
 	explore := iniFile.Section("explore")
 	ExploreEnabled = explore.Key("enabled").MustBool(true)
+
+	kiosk := iniFile.Section("kiosk")
+	KioskMode = valueAsString(kiosk, "mode", "off")
 
 	help := iniFile.Section("help")
 	HelpEnabled = help.Key("enabled").MustBool(true)

@@ -1,44 +1,44 @@
-import { css } from '@emotion/css';
-import React, { FC, ReactNode, useContext, useEffect } from 'react';
-import { connect, ConnectedProps } from 'react-redux';
-import { useLocation } from 'react-router-dom';
+import {css} from '@emotion/css';
+import React, {FC, ReactNode, useContext, useEffect} from 'react';
+import {connect, ConnectedProps} from 'react-redux';
+import {useLocation} from 'react-router-dom';
 
-import { locationUtil, textUtil } from '@grafana/data';
-import { selectors as e2eSelectors } from '@grafana/e2e-selectors/src';
-import { locationService } from '@grafana/runtime';
+import {locationUtil, textUtil} from '@grafana/data';
+import {selectors as e2eSelectors} from '@grafana/e2e-selectors/src';
+import {locationService} from '@grafana/runtime';
 import {
   ButtonGroup,
-  ModalsController,
-  ToolbarButton,
-  PageToolbar,
-  useForceUpdate,
-  Tag,
-  ToolbarButtonRow,
-  ModalsContext,
   ConfirmModal,
+  ModalsContext,
+  ModalsController,
+  PageToolbar,
+  Tag,
+  ToolbarButton,
+  ToolbarButtonRow,
+  useForceUpdate,
 } from '@grafana/ui';
-import { AppChromeUpdate } from 'app/core/components/AppChrome/AppChromeUpdate';
-import { NavToolbarSeparator } from 'app/core/components/AppChrome/NavToolbarSeparator';
+import {AppChromeUpdate} from 'app/core/components/AppChrome/AppChromeUpdate';
+import {NavToolbarSeparator} from 'app/core/components/AppChrome/NavToolbarSeparator';
 import config from 'app/core/config';
-import { useGrafana } from 'app/core/context/GrafanaContext';
-import { useAppNotification } from 'app/core/copy/appNotification';
-import { appEvents } from 'app/core/core';
-import { useBusEvent } from 'app/core/hooks/useBusEvent';
-import { t, Trans } from 'app/core/internationalization';
-import { DashboardCommentsModal } from 'app/features/dashboard/components/DashboardComments/DashboardCommentsModal';
-import { SaveDashboardDrawer } from 'app/features/dashboard/components/SaveDashboard/SaveDashboardDrawer';
-import { ShareModal } from 'app/features/dashboard/components/ShareModal';
-import { playlistSrv } from 'app/features/playlist/PlaylistSrv';
-import { updateTimeZoneForSession } from 'app/features/profile/state/reducers';
-import { KioskMode } from 'app/types';
-import { DashboardMetaChangedEvent, ShowModalReactEvent } from 'app/types/events';
+import {useGrafana} from 'app/core/context/GrafanaContext';
+import {useAppNotification} from 'app/core/copy/appNotification';
+import {appEvents} from 'app/core/core';
+import {useBusEvent} from 'app/core/hooks/useBusEvent';
+import {t, Trans} from 'app/core/internationalization';
+import {DashboardCommentsModal} from 'app/features/dashboard/components/DashboardComments/DashboardCommentsModal';
+import {SaveDashboardDrawer} from 'app/features/dashboard/components/SaveDashboard/SaveDashboardDrawer';
+import {ShareModal} from 'app/features/dashboard/components/ShareModal';
+import {playlistSrv} from 'app/features/playlist/PlaylistSrv';
+import {updateTimeZoneForSession} from 'app/features/profile/state/reducers';
+import {KioskMode} from 'app/types';
+import {DashboardMetaChangedEvent, ShowModalReactEvent} from 'app/types/events';
 
-import { setStarred } from '../../../../core/reducers/navBarTree';
-import { getDashboardSrv } from '../../services/DashboardSrv';
-import { DashboardModel } from '../../state';
+import {setStarred} from '../../../../core/reducers/navBarTree';
+import {getDashboardSrv} from '../../services/DashboardSrv';
+import {DashboardModel} from '../../state';
 
-import { DashNavButton } from './DashNavButton';
-import { DashNavTimeControls } from './DashNavTimeControls';
+import {DashNavButton} from './DashNavButton';
+import {DashNavTimeControls} from './DashNavTimeControls';
 
 const mapDispatchToProps = {
   setStarred,
@@ -198,7 +198,7 @@ export const DashNav = React.memo<Props>((props) => {
     const { canStar, canShare, isStarred } = dashboard.meta;
     const buttons: ReactNode[] = [];
 
-    if (kioskMode || isPlaylistRunning()) {
+    if ((kioskMode !== KioskMode.Off && kioskMode !== KioskMode.Embed) || isPlaylistRunning()) {
       return [];
     }
 
