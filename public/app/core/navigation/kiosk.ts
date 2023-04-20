@@ -6,9 +6,8 @@ import {locationService} from "../../../../packages/grafana-runtime";
 
 // TODO Remove after topnav feature toggle is permanent and old NavBar is removed
 export function getKioskMode(queryParams: UrlQueryMap): KioskMode | null {
-  const kiosk = locationService.getSearchObject().kiosk;
   if (config.KioskMode === 'off') {
-    switch (kiosk) {
+    switch (queryParams.kiosk) {
       case 'tv':
         return KioskMode.TV;
       //  legacy support

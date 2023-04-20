@@ -198,8 +198,18 @@ export const DashNav = React.memo<Props>((props) => {
     const { canStar, canShare, isStarred } = dashboard.meta;
     const buttons: ReactNode[] = [];
 
-    if ((kioskMode !== KioskMode.Off && kioskMode !== KioskMode.Embed) || isPlaylistRunning()) {
-      return [];
+    if ((kioskMode && kioskMode !== KioskMode.Embed) || isPlaylistRunning()) {
+      //return [];
+      buttons.push(
+        <DashNavButton
+          tooltip={kioskMode}
+          icon={'star'}
+          iconType={'default'}
+          iconSize="lg"
+          onClick={onStarDashboard}
+          key="button-star"
+        />
+      );
     }
 
     if (canStar) {
