@@ -34,6 +34,7 @@ export const decorateWithFrameTypeMetadata = (data: PanelData): ExplorePanelData
   const traceFrames: DataFrame[] = [];
   const nodeGraphFrames: DataFrame[] = [];
   const flameGraphFrames: DataFrame[] = [];
+  const customFrames: DataFrame[] = [];
 
   for (const frame of data.series) {
     switch (frame.meta?.preferredVisualisationType) {
@@ -58,6 +59,11 @@ export const decorateWithFrameTypeMetadata = (data: PanelData): ExplorePanelData
       case 'flamegraph':
         config.featureToggles.flameGraph ? flameGraphFrames.push(frame) : tableFrames.push(frame);
         break;
+      case 'plugin':
+        if (canFindPanel(frame)) {
+          customFrames.push(frame);
+          break;
+        }
       default:
         if (isTimeSeries(frame)) {
           graphFrames.push(frame);
@@ -77,6 +83,7 @@ export const decorateWithFrameTypeMetadata = (data: PanelData): ExplorePanelData
     traceFrames,
     nodeGraphFrames,
     flameGraphFrames,
+    customFrames,
     rawPrometheusFrames,
     graphResult: null,
     tableResult: null,
@@ -272,4 +279,13 @@ function isTimeSeries(frame: DataFrame): boolean {
   return Boolean(
     Object.keys(grouped).length === 2 && grouped[FieldType.time]?.length === 1 && grouped[FieldType.number]
   );
+}
+
+/**
+ * Can we find a panel that matches the type defined on the frame
+ *
+ * @param frame
+ */
+function canFindPanel(frame: DataFrame): boolean {
+  return !!frame.meta?.custom?.pluginID;
 }

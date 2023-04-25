@@ -55,6 +55,7 @@ function setup(error: DataQueryError) {
     logsFrames: [],
     tableFrames: [],
     traceFrames: [],
+    customFrames: [],
     nodeGraphFrames: [],
     rawPrometheusFrames: [],
     flameGraphFrames: [],
