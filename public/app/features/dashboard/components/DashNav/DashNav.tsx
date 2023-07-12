@@ -166,7 +166,7 @@ export const DashNav = React.memo<Props>((props) => {
     const { canStar, canShare, isStarred } = dashboard.meta;
     const buttons: ReactNode[] = [];
 
-    if (kioskMode || isPlaylistRunning()) {
+    if ((kioskMode && kioskMode !== KioskMode.Embed) || isPlaylistRunning()) {
       return [];
     }
 
