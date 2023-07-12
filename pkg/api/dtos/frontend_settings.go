@@ -133,6 +133,7 @@ type FrontendSettingsDTO struct {
 	JwtHeaderName              string                           `json:"jwtHeaderName"`
 	JwtUrlLogin                bool                             `json:"jwtUrlLogin"`
 	AlertingEnabled            bool                             `json:"alertingEnabled"`
+	KioskMode                  string                           `json:"kioskMode"`
 	AlertingErrorOrTimeout     string                           `json:"alertingErrorOrTimeout"`
 	AlertingNoDataOrNullValues string                           `json:"alertingNoDataOrNullValues"`
 	AlertingMinInterval        int64                            `json:"alertingMinInterval"`

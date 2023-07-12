@@ -120,6 +120,7 @@ func (hs *HTTPServer) getFrontendSettings(c *contextmodel.ReqContext) (*dtos.Fro
 		AzureAuthEnabled:                    setting.AzureAuthEnabled,
 		RbacEnabled:                         hs.Cfg.RBACEnabled,
 		ExploreEnabled:                      setting.ExploreEnabled,
+		KioskMode: 						 	 setting.KioskMode,
 		HelpEnabled:                         setting.HelpEnabled,
 		ProfileEnabled:                      setting.ProfileEnabled,
 		QueryHistoryEnabled:                 hs.Cfg.QueryHistoryEnabled,
