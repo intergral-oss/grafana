@@ -485,11 +485,6 @@ export class UnthemedQueryEditor extends PureComponent<Props, State> {
           </InlineField>
         </InlineFieldRow>
         {queryType === GrafanaQueryType.LiveMeasurements && this.renderMeasurementsQuery()}
-        {queryType === GrafanaQueryType.List && this.renderListPublicFiles()}
-        {queryType === GrafanaQueryType.Snapshot && this.renderSnapshotQuery()}
-        {queryType === GrafanaQueryType.Search && (
-          <SearchEditor value={query.search ?? {}} onChange={this.onSearchChange} />
-        )}
       </>
     );
   }
