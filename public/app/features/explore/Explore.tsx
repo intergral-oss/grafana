@@ -1,5 +1,5 @@
 import { css, cx } from '@emotion/css';
-import { get } from 'lodash';
+import { get, groupBy } from 'lodash';
 import memoizeOne from 'memoize-one';
 import React, { createRef } from 'react';
 import { connect, ConnectedProps } from 'react-redux';
@@ -290,12 +290,15 @@ export class Explore extends React.PureComponent<Props, ExploreState> {
   renderCustom(width: number) {
     const { timeZone, queryResponse, absoluteRange } = this.props;
 
-    return queryResponse?.customFrames.map((frame, index) => {
+    const groupedByPlugin = groupBy(queryResponse?.customFrames, 'meta.preferredVisualisationPluginId');
+
+    return Object.entries(groupedByPlugin).map(([pluginId, frames], index) => {
       return (
         <CustomContainer
           key={index}
           timeZone={timeZone}
-          frame={frame}
+          pluginId={pluginId}
+          frames={frames}
           state={queryResponse.state}
           absoluteRange={absoluteRange}
           height={400}
@@ -304,7 +307,6 @@ export class Explore extends React.PureComponent<Props, ExploreState> {
       );
     });
   }
-
   renderCompactUrlWarning() {
     return (
       <FadeIn in={true} duration={100}>

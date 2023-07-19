@@ -14,7 +14,7 @@ export function importPanelPlugin(id: string): Promise<PanelPlugin> {
     return loaded;
   }
 
-  const meta = config.panels[id];
+  const meta = getPanelPluginMeta(id);
 
   if (!meta) {
     throw new Error(`Plugin ${id} not found`);
@@ -23,6 +23,12 @@ export function importPanelPlugin(id: string): Promise<PanelPlugin> {
   promiseCache[id] = getPanelPlugin(meta);
 
   return promiseCache[id];
+}
+export function hasPanelPlugin(id: string): boolean {
+  return !!getPanelPluginMeta(id);
+}
+export function getPanelPluginMeta(id: string): PanelPluginMeta {
+  return config.panels[id]
 }
 
 export function importPanelPluginFromMeta(meta: PanelPluginMeta): Promise<PanelPlugin> {
