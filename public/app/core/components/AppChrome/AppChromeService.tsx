@@ -1,15 +1,15 @@
-import { useObservable } from 'react-use';
-import { BehaviorSubject } from 'rxjs';
+import {useObservable} from 'react-use';
+import {BehaviorSubject} from 'rxjs';
 
-import { AppEvents, NavModel, NavModelItem, PageLayoutType, UrlQueryValue } from '@grafana/data';
-import { locationService, reportInteraction } from '@grafana/runtime';
+import {AppEvents, NavModel, NavModelItem, PageLayoutType, UrlQueryValue} from '@grafana/data';
+import {locationService, reportInteraction} from '@grafana/runtime';
 import appEvents from 'app/core/app_events';
-import { t } from 'app/core/internationalization';
+import {t} from 'app/core/internationalization';
 import store from 'app/core/store';
-import { isShallowEqual } from 'app/core/utils/isShallowEqual';
-import { KioskMode } from 'app/types';
+import {isShallowEqual} from 'app/core/utils/isShallowEqual';
+import {KioskMode} from 'app/types';
 
-import { RouteDescriptor } from '../../navigation/types';
+import {RouteDescriptor} from '../../navigation/types';
 
 export interface AppChromeState {
   chromeless?: boolean;
@@ -126,6 +126,8 @@ export class AppChromeService {
         this.update({ kioskMode: KioskMode.TV });
         break;
       case '1':
+      case 'embed':
+        this.update({kioskMode: KioskMode.Embed });
       case true:
         this.update({ kioskMode: KioskMode.Full });
     }
@@ -135,6 +137,8 @@ export class AppChromeService {
     switch (mode) {
       case KioskMode.TV:
         return 'tv';
+      case KioskMode.Embed:
+        return 'embed';
       case KioskMode.Full:
         return true;
       default:
