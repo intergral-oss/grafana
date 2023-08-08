@@ -41,7 +41,7 @@ export function changeDatasource(
   exploreId: ExploreId,
   datasourceUid: string,
   options?: { importQueries: boolean }
-): ThunkResult<void> {
+): ThunkResult<Promise<void>> {
   return async (dispatch, getState) => {
     const orgId = getState().user.orgId;
     const { history, instance } = await loadAndInitDatasource(orgId, { uid: datasourceUid });
@@ -103,7 +103,6 @@ export const datasourceReducer = (state: ExploreItemState, action: AnyAction): E
       logsResult: null,
       supplementaryQueries: loadSupplementaryQueries(),
       queryResponse: createEmptyQueryResponse(),
-      loading: false,
       queryKeys: [],
       history,
       datasourceMissing: false,

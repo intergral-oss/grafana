@@ -12,7 +12,7 @@ import { InspectStatsTab } from 'app/features/inspector/InspectStatsTab';
 import { QueryInspector } from 'app/features/inspector/QueryInspector';
 import { StoreState, ExploreItemState, ExploreId } from 'app/types';
 
-import { runQueries } from './state/query';
+import { runQueries, selectIsWaitingForData } from './state/query';
 
 interface DispatchProps {
   width: number;
@@ -26,7 +26,10 @@ type Props = DispatchProps & ConnectedProps<typeof connector>;
 export function ExploreQueryInspector(props: Props) {
   const { loading, width, onClose, queryResponse, timeZone } = props;
   const dataFrames = queryResponse?.series || [];
-  const error = queryResponse?.error;
+  let errors = queryResponse?.errors;
+  if (!errors?.length && queryResponse?.error) {
+    errors = [queryResponse.error];
+  }
 
   useEffect(() => {
     reportInteraction('grafana_explore_query_inspector_opened');
@@ -69,12 +72,12 @@ export function ExploreQueryInspector(props: Props) {
   };
 
   const tabs = [statsTab, queryTab, jsonTab, dataTab];
-  if (error) {
+  if (errors?.length) {
     const errorTab: TabConfig = {
       label: 'Error',
       value: 'error',
       icon: 'exclamation-triangle',
-      content: <InspectErrorTab error={error} />,
+      content: <InspectErrorTab errors={errors} />,
     };
     tabs.push(errorTab);
   }
@@ -88,10 +91,10 @@ export function ExploreQueryInspector(props: Props) {
 function mapStateToProps(state: StoreState, { exploreId }: { exploreId: ExploreId }) {
   const explore = state.explore;
   const item: ExploreItemState = explore[exploreId]!;
-  const { loading, queryResponse } = item;
+  const { queryResponse } = item;
 
   return {
-    loading,
+    loading: selectIsWaitingForData(exploreId)(state),
     queryResponse,
   };
 }

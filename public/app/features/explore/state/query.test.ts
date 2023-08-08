@@ -4,45 +4,56 @@ import { thunkTester } from 'test/core/thunk/thunkTester';
 import { assertIsDefined } from 'test/helpers/asserts';
 
 import {
-  ArrayVector,
+  DataQueryRequest,
   DataQueryResponse,
   DataSourceApi,
   DataSourceJsonData,
+  DataSourcePluginMeta,
   DataSourceWithSupplementaryQueriesSupport,
   LoadingState,
   MutableDataFrame,
   RawTimeRange,
   SupplementaryQueryType,
 } from '@grafana/data';
-import { DataQuery } from '@grafana/schema';
-import { ExploreId, ExploreItemState, StoreState, ThunkDispatch } from 'app/types';
+import { config } from '@grafana/runtime';
+import { DataQuery, DataSourceRef } from '@grafana/schema';
+import { createAsyncThunk, ExploreId, ExploreItemState, StoreState, ThunkDispatch } from 'app/types';
 
 import { reducerTester } from '../../../../test/core/redux/reducerTester';
 import { configureStore } from '../../../store/configureStore';
 import { setTimeSrv, TimeSrv } from '../../dashboard/services/TimeSrv';
+import { makeLogs } from '../__mocks__/makeLogs';
 import { supplementaryQueryTypes } from '../utils/supplementaryQueries';
 
 import { createDefaultInitialState } from './helpers';
 import { saveCorrelationsAction } from './main';
+import * as actions from './query';
 import {
+  addQueryRow,
   addQueryRowAction,
   addResultsToCache,
   cancelQueries,
   cancelQueriesAction,
+  changeQueries,
   cleanSupplementaryQueryAction,
+  cleanSupplementaryQueryDataProviderAction,
   clearCache,
+  clearLogs,
   importQueries,
+  QueryEndedPayload,
   queryReducer,
+  queryStreamUpdatedAction,
   runQueries,
   scanStartAction,
   scanStopAction,
   setSupplementaryQueryEnabled,
-  cleanSupplementaryQueryDataProviderAction,
 } from './query';
 import { makeExplorePaneState } from './utils';
 
 const { testRange, defaultInitialState } = createDefaultInitialState();
 
+const exploreId = ExploreId.left;
+const cleanUpMock = jest.fn();
 const datasources: DataSourceApi[] = [
   {
     name: 'testDs',
@@ -54,10 +65,10 @@ const datasources: DataSourceApi[] = [
   } as DataSourceApi<DataQuery, DataSourceJsonData, {}>,
   {
     name: 'testDs2',
-    type: 'postgres',
+    type: 'mysql',
     uid: 'ds2',
     getRef: () => {
-      return { type: 'postgres', uid: 'ds2' };
+      return { type: 'mysql', uid: 'ds2' };
     },
   } as DataSourceApi<DataQuery, DataSourceJsonData, {}>,
 ];
@@ -77,8 +88,19 @@ jest.mock('@grafana/runtime', () => ({
   }),
   getDataSourceSrv: () => {
     return {
-      get: (uid?: string) => datasources.find((ds) => ds.uid === uid) || datasources[0],
+      get: (ref?: DataSourceRef | string) => {
+        if (!ref) {
+          return datasources[0];
+        }
+
+        return (
+          datasources.find((ds) => (typeof ref === 'string' ? ds.uid === ref : ds.uid === ref.uid)) || datasources[0]
+        );
+      },
     };
+  },
+  config: {
+    featureToggles: { exploreMixedDatasource: false },
   },
 }));
 
@@ -90,7 +112,7 @@ function setupQueryResponse(state: StoreState) {
       error: { message: 'test error' },
       data: [
         new MutableDataFrame({
-          fields: [{ name: 'test', values: new ArrayVector() }],
+          fields: [{ name: 'test', values: [] }],
           meta: {
             preferredVisualisationType: 'graph',
           },
@@ -98,6 +120,30 @@ function setupQueryResponse(state: StoreState) {
       ],
     } as DataQueryResponse)
   );
+}
+
+async function setupStore(queries: DataQuery[], datasourceInstance: Partial<DataSourceApi>) {
+  let dispatch: ThunkDispatch, getState: () => StoreState;
+
+  const store: { dispatch: ThunkDispatch; getState: () => StoreState } = configureStore({
+    ...defaultInitialState,
+    explore: {
+      [exploreId]: {
+        ...defaultInitialState.explore[exploreId],
+        queries: queries,
+        datasourceInstance: datasourceInstance,
+      },
+    },
+  } as unknown as Partial<StoreState>);
+
+  dispatch = store.dispatch;
+  getState = store.getState;
+
+  setupQueryResponse(getState());
+
+  await dispatch(addQueryRow(exploreId, 1));
+
+  return getState;
 }
 
 describe('runQueries', () => {
@@ -130,7 +176,7 @@ describe('runQueries', () => {
       expect(datasource.getDataProvider).toHaveBeenCalledWith(
         type,
         expect.objectContaining({
-          requestId: `explore_left_${snakeCase(type)}`,
+          requestId: `explore_left_${snakeCase(type)}_0`,
         })
       );
     }
@@ -197,6 +243,159 @@ describe('running queries', () => {
   });
 });
 
+describe('changeQueries', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+  // Due to how spyOn works (it removes `type`, `match` and `toString` from the spied function, on which we rely on in the reducer),
+  // we are repeating the following tests twice, once to chck the resulting state and once to check that the correct actions are dispatched.
+  describe('calls the correct actions', () => {
+    it('should import queries when datasource is changed', async () => {
+      jest.spyOn(actions, 'importQueries');
+      jest.spyOn(actions, 'changeQueriesAction');
+
+      const originalQueries = [{ refId: 'A', datasource: datasources[0].getRef() }];
+
+      const { dispatch } = configureStore({
+        ...defaultInitialState,
+        explore: {
+          [ExploreId.left]: {
+            ...defaultInitialState.explore[ExploreId.left],
+            datasourceInstance: datasources[0],
+            queries: originalQueries,
+          },
+        },
+      } as unknown as Partial<StoreState>);
+
+      await dispatch(
+        changeQueries({
+          queries: [{ refId: 'A', datasource: datasources[1].getRef() }],
+          exploreId: ExploreId.left,
+        })
+      );
+
+      expect(actions.changeQueriesAction).not.toHaveBeenCalled();
+      expect(actions.importQueries).toHaveBeenCalledWith(
+        ExploreId.left,
+        originalQueries,
+        datasources[0],
+        datasources[1],
+        originalQueries[0].refId
+      );
+    });
+
+    it('should not import queries when datasource is not changed', async () => {
+      jest.spyOn(actions, 'importQueries');
+      jest.spyOn(actions, 'changeQueriesAction');
+
+      const { dispatch } = configureStore({
+        ...defaultInitialState,
+        explore: {
+          [ExploreId.left]: {
+            ...defaultInitialState.explore[ExploreId.left],
+            datasourceInstance: datasources[0],
+            queries: [{ refId: 'A', datasource: datasources[0].getRef() }],
+          },
+        },
+      } as unknown as Partial<StoreState>);
+
+      await dispatch(
+        changeQueries({
+          queries: [{ refId: 'A', datasource: datasources[0].getRef(), queryType: 'someValue' }],
+          exploreId: ExploreId.left,
+        })
+      );
+
+      expect(actions.changeQueriesAction).toHaveBeenCalled();
+      expect(actions.importQueries).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('correctly modifies the state', () => {
+    it('should import queries when datasource is changed', async () => {
+      const originalQueries = [{ refId: 'A', datasource: datasources[0].getRef() }];
+
+      const { dispatch, getState } = configureStore({
+        ...defaultInitialState,
+        explore: {
+          [ExploreId.left]: {
+            ...defaultInitialState.explore[ExploreId.left],
+            datasourceInstance: datasources[0],
+            queries: originalQueries,
+          },
+        },
+      } as unknown as Partial<StoreState>);
+
+      await dispatch(
+        changeQueries({
+          queries: [{ refId: 'A', datasource: datasources[1].getRef() }],
+          exploreId: ExploreId.left,
+        })
+      );
+
+      expect(getState().explore[ExploreId.left].queries[0]).toHaveProperty('refId', 'A');
+      expect(getState().explore[ExploreId.left].queries[0]).toHaveProperty('datasource', datasources[1].getRef());
+    });
+
+    it('should not import queries when datasource is not changed', async () => {
+      const { dispatch, getState } = configureStore({
+        ...defaultInitialState,
+        explore: {
+          [ExploreId.left]: {
+            ...defaultInitialState.explore[ExploreId.left],
+            datasourceInstance: datasources[0],
+            queries: [{ refId: 'A', datasource: datasources[0].getRef() }],
+          },
+        },
+      } as unknown as Partial<StoreState>);
+
+      await dispatch(
+        changeQueries({
+          queries: [{ refId: 'A', datasource: datasources[0].getRef(), queryType: 'someValue' }],
+          exploreId: ExploreId.left,
+        })
+      );
+
+      expect(getState().explore[ExploreId.left].queries[0]).toHaveProperty('refId', 'A');
+      expect(getState().explore[ExploreId.left].queries[0]).toHaveProperty('datasource', datasources[0].getRef());
+      expect(getState().explore[ExploreId.left].queries[0]).toEqual({
+        refId: 'A',
+        datasource: datasources[0].getRef(),
+        queryType: 'someValue',
+      });
+    });
+  });
+
+  it('runs remaining queries when one query is removed', async () => {
+    jest.spyOn(actions, 'runQueries').mockImplementation(createAsyncThunk('@explore/runQueries', () => {}));
+
+    const originalQueries = [
+      { refId: 'A', as: 1, datasource: datasources[0].getRef() },
+      { refId: 'B', as: 2, datasource: datasources[0].getRef() },
+    ];
+
+    const { dispatch } = configureStore({
+      ...defaultInitialState,
+      explore: {
+        left: {
+          ...defaultInitialState.explore.left,
+          datasourceInstance: datasources[0],
+          queries: originalQueries,
+        },
+      },
+    } as unknown as Partial<StoreState>);
+
+    await dispatch(
+      changeQueries({
+        queries: [originalQueries[0]],
+        exploreId: ExploreId.left,
+      })
+    );
+
+    expect(actions.runQueries).toHaveBeenCalled();
+  });
+});
+
 describe('importing queries', () => {
   describe('when importing queries between the same type of data source', () => {
     it('remove datasource property from all of the queries', async () => {
@@ -226,6 +425,159 @@ describe('importing queries', () => {
       expect(getState().explore[ExploreId.left].queries[1]).toHaveProperty('refId', 'refId_B');
       expect(getState().explore[ExploreId.left].queries[0]).toHaveProperty('datasource.uid', 'ds2');
       expect(getState().explore[ExploreId.left].queries[1]).toHaveProperty('datasource.uid', 'ds2');
+    });
+  });
+});
+
+describe('adding new query rows', () => {
+  describe('with mixed datasources disabled', () => {
+    it('should add query row when there is not yet a row and meta.mixed === true (impossible in UI)', async () => {
+      const queries: DataQuery[] = [];
+      const datasourceInstance = {
+        query: jest.fn(),
+        getRef: () => {
+          return { type: 'loki', uid: 'uid-loki' };
+        },
+        meta: {
+          id: 'mixed',
+          mixed: true,
+        } as unknown as DataSourcePluginMeta<{}>,
+      };
+
+      const getState = await setupStore(queries, datasourceInstance);
+
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.id).toBe('mixed');
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.mixed).toBe(true);
+      expect(getState().explore[exploreId].queries).toHaveLength(1);
+      expect(getState().explore[exploreId].queryKeys).toEqual(['uid-loki-0']);
+    });
+    it('should add query row when there is not yet a row and meta.mixed === false', async () => {
+      const queries: DataQuery[] = [];
+      const datasourceInstance = {
+        query: jest.fn(),
+        getRef: () => {
+          return { type: 'loki', uid: 'uid-loki' };
+        },
+        meta: {
+          id: 'loki',
+          mixed: false,
+        } as unknown as DataSourcePluginMeta<{}>,
+      };
+
+      const getState = await setupStore(queries, datasourceInstance);
+
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.id).toBe('loki');
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.mixed).toBe(false);
+      expect(getState().explore[exploreId].queries).toHaveLength(1);
+      expect(getState().explore[exploreId].queryKeys).toEqual(['uid-loki-0']);
+    });
+
+    it('should add another query row if there are two rows already', async () => {
+      const queries = [
+        {
+          datasource: { type: 'loki', uid: 'ds3' },
+          refId: 'C',
+        },
+        {
+          datasource: { type: 'loki', uid: 'ds4' },
+          refId: 'D',
+        },
+      ];
+      const datasourceInstance = {
+        query: jest.fn(),
+        getRef: jest.fn(),
+        meta: {
+          id: 'loki',
+          mixed: false,
+        } as unknown as DataSourcePluginMeta<{}>,
+      };
+      const getState = await setupStore(queries, datasourceInstance);
+
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.id).toBe('loki');
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.mixed).toBe(false);
+      expect(getState().explore[exploreId].queries).toHaveLength(3);
+      expect(getState().explore[exploreId].queryKeys).toEqual(['ds3-0', 'ds4-1', 'ds4-2']);
+    });
+  });
+  describe('with mixed datasources enabled', () => {
+    beforeEach(() => {
+      config.featureToggles.exploreMixedDatasource = true;
+    });
+
+    afterEach(() => {
+      config.featureToggles.exploreMixedDatasource = false;
+    });
+
+    it('should add query row whith root ds (without overriding the default ds) when there is not yet a row', async () => {
+      const queries: DataQuery[] = [];
+      const datasourceInstance = {
+        query: jest.fn(),
+        getRef: jest.fn(),
+        meta: {
+          id: 'mixed',
+          mixed: true,
+        } as unknown as DataSourcePluginMeta<{}>,
+      };
+
+      const getState = await setupStore(queries, datasourceInstance);
+
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.id).toBe('mixed');
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.mixed).toBe(true);
+      expect(getState().explore[exploreId].queries).toHaveLength(1);
+      expect(getState().explore[exploreId].queries[0]?.datasource?.type).toBe('postgres');
+      expect(getState().explore[exploreId].queryKeys).toEqual(['ds1-0']);
+    });
+
+    it('should add query row whith root ds (with overriding the default ds) when there is not yet a row', async () => {
+      const queries: DataQuery[] = [];
+      const datasourceInstance = {
+        query: jest.fn(),
+        getRef: () => {
+          return { type: 'loki', uid: 'uid-loki' };
+        },
+        meta: {
+          id: 'loki',
+          mixed: false,
+        } as unknown as DataSourcePluginMeta<{}>,
+      };
+
+      const getState = await setupStore(queries, datasourceInstance);
+
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.id).toBe('loki');
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.mixed).toBe(false);
+      expect(getState().explore[exploreId].queries).toHaveLength(1);
+      expect(getState().explore[exploreId].queries[0]?.datasource?.type).toBe('loki');
+      expect(getState().explore[exploreId].queryKeys).toEqual(['uid-loki-0']);
+    });
+
+    it('should add another query row if there are two rows already (impossible in UI)', async () => {
+      const queries = [
+        {
+          datasource: { type: 'postgres', uid: 'ds3' },
+          refId: 'C',
+        },
+        {
+          datasource: { type: 'loki', uid: 'ds4' },
+          refId: 'D',
+        },
+      ];
+      const datasourceInstance = {
+        query: jest.fn(),
+        getRef: jest.fn(),
+        meta: {
+          // datasourceInstance.meta.id is set to postgres because it's the default datasource
+          id: 'postgres',
+          mixed: false,
+        } as unknown as DataSourcePluginMeta<{}>,
+      };
+
+      const getState = await setupStore(queries, datasourceInstance);
+
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.id).toBe('postgres');
+      expect(getState().explore[exploreId].datasourceInstance?.meta?.mixed).toBe(false);
+      expect(getState().explore[exploreId].queries).toHaveLength(3);
+      expect(getState().explore[exploreId].queries[2]?.datasource?.type).toBe('loki');
+      expect(getState().explore[exploreId].queryKeys).toEqual(['ds3-0', 'ds4-1', 'ds4-2']);
     });
   });
 });
@@ -265,7 +617,7 @@ describe('reducer', () => {
   });
 
   describe('query rows', () => {
-    it('adds a new query row', () => {
+    it('should add query row when there is no query row yet', () => {
       reducerTester<ExploreItemState>()
         .givenReducer(queryReducer, {
           queries: [],
@@ -280,6 +632,26 @@ describe('reducer', () => {
         .thenStateShouldEqual({
           queries: [{ refId: 'A', key: 'mockKey' }],
           queryKeys: ['mockKey-0'],
+        } as unknown as ExploreItemState);
+    });
+    it('should add query row when there is already one query row', () => {
+      reducerTester<ExploreItemState>()
+        .givenReducer(queryReducer, {
+          queries: [{ refId: 'A', key: 'initialRow', datasource: { type: 'loki' } }],
+        } as unknown as ExploreItemState)
+        .whenActionIsDispatched(
+          addQueryRowAction({
+            exploreId: ExploreId.left,
+            query: { refId: 'B', key: 'mockKey', datasource: { type: 'loki' } },
+            index: 0,
+          })
+        )
+        .thenStateShouldEqual({
+          queries: [
+            { refId: 'A', key: 'initialRow', datasource: { type: 'loki' } },
+            { refId: 'B', key: 'mockKey', datasource: { type: 'loki' } },
+          ],
+          queryKeys: ['initialRow-0', 'mockKey-1'],
         } as unknown as ExploreItemState);
     });
   });
@@ -372,6 +744,35 @@ describe('reducer', () => {
       await dispatch(clearCache(ExploreId.left));
 
       expect(getState().explore[ExploreId.left].cache).toEqual([]);
+    });
+  });
+
+  describe('when data source does not support log volume supplementary query', () => {
+    it('cleans up query subscription correctly (regression #70049)', async () => {
+      const store: { dispatch: ThunkDispatch; getState: () => StoreState } = configureStore({
+        ...defaultInitialState,
+        explore: {
+          left: {
+            ...defaultInitialState.explore.left,
+            datasourceInstance: {
+              getRef: jest.fn(),
+              meta: {
+                id: 'something',
+              },
+              query(request: DataQueryRequest<DataQuery>): Promise<DataQueryResponse> | Observable<DataQueryResponse> {
+                return new Observable(() => cleanUpMock);
+              },
+            },
+          },
+        },
+      } as unknown as Partial<StoreState>);
+
+      const dispatch = store.dispatch;
+
+      cleanUpMock.mockClear();
+      await dispatch(runQueries(ExploreId.left));
+      await dispatch(cancelQueries(ExploreId.left));
+      expect(cleanUpMock).toBeCalledTimes(1);
     });
   });
 
@@ -584,6 +985,79 @@ describe('reducer', () => {
       expect(
         getState().explore[ExploreId.left].supplementaryQueries[SupplementaryQueryType.LogsSample].dataSubscription
       ).toBeUndefined();
+    });
+  });
+  describe('clear live logs', () => {
+    it('should clear current log rows', async () => {
+      const logRows = makeLogs(10);
+
+      const { dispatch, getState }: { dispatch: ThunkDispatch; getState: () => StoreState } = configureStore({
+        ...defaultInitialState,
+        explore: {
+          [ExploreId.left]: {
+            ...defaultInitialState.explore[ExploreId.left],
+            queryResponse: {
+              state: LoadingState.Streaming,
+            },
+            logsResult: {
+              hasUniqueLabels: false,
+              rows: logRows,
+            },
+          },
+        },
+      } as unknown as Partial<StoreState>);
+      expect(getState().explore[ExploreId.left].logsResult?.rows.length).toBe(logRows.length);
+
+      await dispatch(clearLogs({ exploreId: ExploreId.left }));
+
+      expect(getState().explore[ExploreId.left].logsResult?.rows.length).toBe(0);
+      expect(getState().explore[ExploreId.left].clearedAtIndex).toBe(logRows.length - 1);
+    });
+
+    it('should filter new log rows', async () => {
+      const oldLogRows = makeLogs(10);
+      const newLogRows = makeLogs(5);
+      const allLogRows = [...oldLogRows, ...newLogRows];
+
+      const { dispatch, getState }: { dispatch: ThunkDispatch; getState: () => StoreState } = configureStore({
+        ...defaultInitialState,
+        explore: {
+          [ExploreId.left]: {
+            ...defaultInitialState.explore[ExploreId.left],
+            isLive: true,
+            queryResponse: {
+              state: LoadingState.Streaming,
+            },
+            logsResult: {
+              hasUniqueLabels: false,
+              rows: oldLogRows,
+            },
+          },
+        },
+      } as unknown as Partial<StoreState>);
+
+      expect(getState().explore[ExploreId.left].logsResult?.rows.length).toBe(oldLogRows.length);
+
+      await dispatch(clearLogs({ exploreId: ExploreId.left }));
+      await dispatch(
+        queryStreamUpdatedAction({
+          exploreId: ExploreId.left,
+          response: {
+            request: true,
+            traceFrames: [],
+            nodeGraphFrames: [],
+            rawPrometheusFrames: [],
+            flameGraphFrames: [],
+            logsResult: {
+              hasUniqueLabels: false,
+              rows: allLogRows,
+            },
+          },
+        } as unknown as QueryEndedPayload)
+      );
+
+      expect(getState().explore[ExploreId.left].logsResult?.rows.length).toBe(newLogRows.length);
+      expect(getState().explore[ExploreId.left].clearedAtIndex).toBe(oldLogRows.length - 1);
     });
   });
 });

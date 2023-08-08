@@ -7,17 +7,17 @@ import Selecto from 'selecto';
 
 import { AppEvents, GrafanaTheme2, PanelData } from '@grafana/data';
 import { locationService } from '@grafana/runtime/src';
-import { Portal, stylesFactory } from '@grafana/ui';
-import { config } from 'app/core/config';
-import { CanvasFrameOptions, DEFAULT_CANVAS_ELEMENT_CONFIG } from 'app/features/canvas';
 import {
   ColorDimensionConfig,
-  DimensionContext,
   ResourceDimensionConfig,
   ScalarDimensionConfig,
   ScaleDimensionConfig,
   TextDimensionConfig,
-} from 'app/features/dimensions';
+} from '@grafana/schema';
+import { Portal, stylesFactory } from '@grafana/ui';
+import { config } from 'app/core/config';
+import { CanvasFrameOptions, DEFAULT_CANVAS_ELEMENT_CONFIG } from 'app/features/canvas';
+import { DimensionContext } from 'app/features/dimensions';
 import {
   getColorDimensionFromData,
   getResourceDimensionFromData,
@@ -77,6 +77,8 @@ export class Scene {
 
   tooltipCallback?: (tooltip: CanvasTooltipPayload | undefined) => void;
   tooltip?: CanvasTooltipPayload;
+
+  moveableActionCallback?: (moved: boolean) => void;
 
   readonly editModeEnabled = new BehaviorSubject<boolean>(false);
   subscription: Subscription;
@@ -142,6 +144,8 @@ export class Scene {
         this.initMoveable(destroySelecto, enableEditing);
         this.currentLayer = this.root;
         this.selection.next([]);
+        this.connections.select(undefined);
+        this.connections.updateState();
       }
     });
     return this.root;
@@ -407,13 +411,29 @@ export class Scene {
       })
       .on('drag', (event) => {
         const targetedElement = this.findElementByTarget(event.target);
-        targetedElement!.applyDrag(event);
+        if (targetedElement) {
+          targetedElement.applyDrag(event);
+
+          if (this.connections.connectionsNeedUpdate(targetedElement) && this.moveableActionCallback) {
+            this.moveableActionCallback(true);
+          }
+        }
       })
       .on('dragGroup', (e) => {
-        e.events.forEach((event) => {
+        let needsUpdate = false;
+        for (let event of e.events) {
           const targetedElement = this.findElementByTarget(event.target);
-          targetedElement!.applyDrag(event);
-        });
+          if (targetedElement) {
+            targetedElement.applyDrag(event);
+            if (!needsUpdate) {
+              needsUpdate = this.connections.connectionsNeedUpdate(targetedElement);
+            }
+          }
+        }
+
+        if (needsUpdate && this.moveableActionCallback) {
+          this.moveableActionCallback(true);
+        }
       })
       .on('dragGroupEnd', (e) => {
         e.events.forEach((event) => {
@@ -450,14 +470,32 @@ export class Scene {
       })
       .on('resize', (event) => {
         const targetedElement = this.findElementByTarget(event.target);
-        targetedElement!.applyResize(event);
+        if (targetedElement) {
+          targetedElement.applyResize(event);
+
+          if (this.connections.connectionsNeedUpdate(targetedElement) && this.moveableActionCallback) {
+            this.moveableActionCallback(true);
+          }
+        }
         this.moved.next(Date.now()); // TODO only on end
       })
       .on('resizeGroup', (e) => {
-        e.events.forEach((event) => {
+        let needsUpdate = false;
+        for (let event of e.events) {
           const targetedElement = this.findElementByTarget(event.target);
-          targetedElement!.applyResize(event);
-        });
+          if (targetedElement) {
+            targetedElement.applyResize(event);
+
+            if (!needsUpdate) {
+              needsUpdate = this.connections.connectionsNeedUpdate(targetedElement);
+            }
+          }
+        }
+
+        if (needsUpdate && this.moveableActionCallback) {
+          this.moveableActionCallback(true);
+        }
+
         this.moved.next(Date.now()); // TODO only on end
       })
       .on('resizeEnd', (event) => {
@@ -605,8 +643,8 @@ export class Scene {
 
   render() {
     const canShowContextMenu = this.isPanelEditing || (!this.isPanelEditing && this.isEditingEnabled);
-    const canShowElementTooltip =
-      !this.isEditingEnabled && this.tooltip?.element && this.tooltip.element.data.links?.length > 0;
+    const isTooltipValid = (this.tooltip?.element?.data?.links?.length ?? 0) > 0;
+    const canShowElementTooltip = !this.isEditingEnabled && isTooltipValid;
 
     return (
       <div key={this.revId} className={this.styles.wrap} style={this.style} ref={this.setRef}>

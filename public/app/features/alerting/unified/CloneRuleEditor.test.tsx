@@ -1,20 +1,18 @@
-import { render, waitFor, waitForElementToBeRemoved } from '@testing-library/react';
+import { render, waitFor, waitForElementToBeRemoved, within } from '@testing-library/react';
 import { setupServer } from 'msw/node';
 import React from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
-import { Provider } from 'react-redux';
-import { MemoryRouter } from 'react-router-dom';
+import { TestProvider } from 'test/helpers/TestProvider';
 import { byRole, byTestId, byText } from 'testing-library-selector';
 
 import { selectors } from '@grafana/e2e-selectors/src';
 import { config, setBackendSrv, setDataSourceSrv } from '@grafana/runtime';
 import { backendSrv } from 'app/core/services/backend_srv';
 import 'whatwg-fetch';
-import { RuleWithLocation } from 'app/types/unified-alerting';
 
 import { RulerGrafanaRuleDTO } from '../../../types/unified-alerting-dto';
 
-import { CloneRuleEditor, generateCopiedRuleTitle } from './CloneRuleEditor';
+import { CloneRuleEditor } from './CloneRuleEditor';
 import { ExpressionEditorProps } from './components/rule-editor/ExpressionEditor';
 import { mockDataSource, MockDataSourceSrv, mockRulerAlertingRule, mockRulerGrafanaRule, mockStore } from './mocks';
 import { mockSearchApiResponse } from './mocks/grafanaApi';
@@ -57,7 +55,6 @@ const ui = {
     labelValue: (idx: number) => byTestId(`label-value-${idx}`),
   },
   loadingIndicator: byText('Loading the rule'),
-  loadingGroupIndicator: byText('Loading...'),
 };
 
 function getProvidersWrapper() {
@@ -92,11 +89,9 @@ function getProvidersWrapper() {
     const formApi = useForm<RuleFormValues>({ defaultValues: getDefaultFormValues() });
 
     return (
-      <MemoryRouter>
-        <Provider store={store}>
-          <FormProvider {...formApi}>{children}</FormProvider>
-        </Provider>
-      </MemoryRouter>
+      <TestProvider store={store}>
+        <FormProvider {...formApi}>{children}</FormProvider>
+      </TestProvider>
     );
   };
 }
@@ -126,7 +121,7 @@ describe('CloneRuleEditor', function () {
       });
 
       await waitForElementToBeRemoved(ui.loadingIndicator.query());
-      await waitForElementToBeRemoved(ui.loadingGroupIndicator.query(), { container: ui.inputs.group.get() });
+      await waitForElementToBeRemoved(within(ui.inputs.group.get()).getByTestId('Spinner'));
 
       await waitFor(() => {
         expect(ui.inputs.name.get()).toHaveValue('First Grafana Rule (copy)');
@@ -198,87 +193,5 @@ describe('CloneRuleEditor', function () {
         expect(ui.inputs.annotationValue(0).get()).toHaveTextContent('This is a very important alert rule');
       });
     });
-  });
-});
-
-describe('generateCopiedRuleTitle', () => {
-  it('should generate copy name', () => {
-    const fileName = 'my file';
-    const expectedDuplicateName = 'my file (copy)';
-
-    const ruleWithLocation = {
-      rule: {
-        grafana_alert: {
-          title: fileName,
-        },
-      },
-      group: {
-        rules: [],
-      },
-    } as unknown as RuleWithLocation;
-
-    expect(generateCopiedRuleTitle(ruleWithLocation)).toEqual(expectedDuplicateName);
-  });
-
-  it('should generate copy name and number from original file', () => {
-    const fileName = 'my file';
-    const duplicatedName = 'my file (copy)';
-    const expectedDuplicateName = 'my file (copy 2)';
-
-    const ruleWithLocation = {
-      rule: {
-        grafana_alert: {
-          title: fileName,
-        },
-      },
-      group: {
-        rules: [{ grafana_alert: { title: fileName } }, { grafana_alert: { title: duplicatedName } }],
-      },
-    } as RuleWithLocation;
-
-    expect(generateCopiedRuleTitle(ruleWithLocation)).toEqual(expectedDuplicateName);
-  });
-
-  it('should generate copy name and number from duplicated file', () => {
-    const fileName = 'my file (copy)';
-    const duplicatedName = 'my file (copy 2)';
-    const expectedDuplicateName = 'my file (copy 3)';
-
-    const ruleWithLocation = {
-      rule: {
-        grafana_alert: {
-          title: fileName,
-        },
-      },
-      group: {
-        rules: [{ grafana_alert: { title: fileName } }, { grafana_alert: { title: duplicatedName } }],
-      },
-    } as RuleWithLocation;
-
-    expect(generateCopiedRuleTitle(ruleWithLocation)).toEqual(expectedDuplicateName);
-  });
-
-  it('should generate copy name and number from duplicated file in gap', () => {
-    const fileName = 'my file (copy)';
-    const duplicatedName = 'my file (copy 3)';
-    const expectedDuplicateName = 'my file (copy 2)';
-
-    const ruleWithLocation = {
-      rule: {
-        grafana_alert: {
-          title: fileName,
-        },
-      },
-      group: {
-        rules: [
-          {
-            grafana_alert: { title: fileName },
-          },
-          { grafana_alert: { title: duplicatedName } },
-        ],
-      },
-    } as RuleWithLocation;
-
-    expect(generateCopiedRuleTitle(ruleWithLocation)).toEqual(expectedDuplicateName);
   });
 });

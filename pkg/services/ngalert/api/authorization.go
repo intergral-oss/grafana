@@ -58,6 +58,10 @@ func (api *API) authorize(method, path string) web.Handler {
 			ac.EvalPermission(ac.ActionAlertingRuleCreate, scope),
 			ac.EvalPermission(ac.ActionAlertingRuleDelete, scope),
 		)
+	// Grafana rule state history paths
+	case http.MethodGet + "/api/v1/rules/history":
+		fallback = middleware.ReqSignedIn
+		eval = ac.EvalPermission(ac.ActionAlertingRuleRead)
 
 	// Grafana, Prometheus-compatible Paths
 	case http.MethodGet + "/api/prometheus/grafana/api/v1/rules":
@@ -154,16 +158,24 @@ func (api *API) authorize(method, path string) web.Handler {
 	case http.MethodGet + "/api/alertmanager/grafana/config/api/v1/alerts":
 		fallback = middleware.ReqEditorRole
 		eval = ac.EvalPermission(ac.ActionAlertingNotificationsRead)
+	case http.MethodGet + "/api/alertmanager/grafana/config/history":
+		fallback = middleware.ReqEditorRole
+		eval = ac.EvalPermission(ac.ActionAlertingNotificationsRead)
 	case http.MethodGet + "/api/alertmanager/grafana/api/v2/status":
 		eval = ac.EvalPermission(ac.ActionAlertingNotificationsRead)
 	case http.MethodPost + "/api/alertmanager/grafana/config/api/v1/alerts":
 		// additional authorization is done in the request handler
 		eval = ac.EvalAny(ac.EvalPermission(ac.ActionAlertingNotificationsWrite))
+	case http.MethodPost + "/api/alertmanager/grafana/config/history/{id}/_activate":
+		eval = ac.EvalAny(ac.EvalPermission(ac.ActionAlertingNotificationsWrite))
 	case http.MethodGet + "/api/alertmanager/grafana/config/api/v1/receivers":
 		eval = ac.EvalPermission(ac.ActionAlertingNotificationsRead)
 	case http.MethodPost + "/api/alertmanager/grafana/config/api/v1/receivers/test":
 		fallback = middleware.ReqEditorRole
-		eval = ac.EvalPermission(ac.ActionAlertingNotificationsRead)
+		eval = ac.EvalPermission(ac.ActionAlertingNotificationsWrite)
+	case http.MethodPost + "/api/alertmanager/grafana/config/api/v1/templates/test":
+		fallback = middleware.ReqEditorRole
+		eval = ac.EvalPermission(ac.ActionAlertingNotificationsWrite)
 
 	// External Alertmanager Paths
 	case http.MethodDelete + "/api/alertmanager/{DatasourceUID}/config/api/v1/alerts":
@@ -236,7 +248,9 @@ func (api *API) authorize(method, path string) web.Handler {
 // authorizeDatasourceAccessForRule checks that user has access to all data sources declared by the rule
 func authorizeDatasourceAccessForRule(rule *ngmodels.AlertRule, evaluator func(evaluator ac.Evaluator) bool) bool {
 	for _, query := range rule.Data {
-		if query.QueryType == expr.DatasourceType || query.DatasourceUID == expr.OldDatasourceUID {
+		if query.QueryType == expr.DatasourceType || query.DatasourceUID == expr.DatasourceUID || query.
+			DatasourceUID == expr.
+			OldDatasourceUID {
 			continue
 		}
 		if !evaluator(ac.EvalPermission(datasources.ActionQuery, datasources.ScopeProvider.GetResourceScopeUID(query.DatasourceUID))) {

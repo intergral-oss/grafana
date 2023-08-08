@@ -94,4 +94,30 @@ def secrets():
             "secret/data/common/aws-marketplace",
             "aws_secret_access_key",
         ),
+        vault_secret(
+            "static_asset_editions",
+            "infra/data/ci/grafana-release-eng/artifact-publishing",
+            "static_asset_editions",
+        ),
+        vault_secret(
+            "enterprise2-cdn-path",
+            "infra/data/ci/grafana-release-eng/enterprise2",
+            "cdn_path",
+        ),
+        # grafana-delivery-bot secrets
+        vault_secret(
+            "delivery-bot-app-id",
+            "infra/data/ci/grafana-release-eng/grafana-delivery-bot",
+            "app-id",
+        ),
+        vault_secret(
+            "delivery-bot-app-installation-id",
+            "infra/data/ci/grafana-release-eng/grafana-delivery-bot",
+            "app-installation-id",
+        ),
+        vault_secret(
+            "delivery-bot-app-private-key",
+            "infra/data/ci/grafana-release-eng/grafana-delivery-bot",
+            "app-private-key",
+        ),
     ]

@@ -1,5 +1,6 @@
 import { debounce, trim } from 'lodash';
 
+import { isEmptyObject } from '@grafana/data';
 import { StoreState, ThunkDispatch, ThunkResult } from 'app/types';
 
 import { variableAdapters } from '../../adapters';
@@ -34,8 +35,13 @@ export const navigateOptions = (rootStateKey: string, key: NavigationKey, clearO
     }
 
     if (key === NavigationKey.selectAndClose) {
+      const picker = getVariablesState(rootStateKey, getState()).optionsPicker;
+
+      if (picker.multi) {
+        return dispatch(toggleOptionByHighlight(rootStateKey, clearOthers));
+      }
       dispatch(toggleOptionByHighlight(rootStateKey, clearOthers, true));
-      return await dispatch(commitChangesToVariable(rootStateKey));
+      return dispatch(commitChangesToVariable(rootStateKey));
     }
 
     if (key === NavigationKey.moveDown) {
@@ -78,6 +84,10 @@ export const filterOrSearchOptions = (
 };
 
 const setVariable = async (updated: VariableWithOptions) => {
+  if (isEmptyObject(updated.current)) {
+    return;
+  }
+
   const adapter = variableAdapters.get(updated.type);
   await adapter.setValue(updated, updated.current, true);
   return;

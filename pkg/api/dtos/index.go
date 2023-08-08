@@ -9,7 +9,7 @@ import (
 
 type IndexViewData struct {
 	User                                *CurrentUser
-	Settings                            map[string]interface{}
+	Settings                            *FrontendSettingsDTO
 	AppUrl                              string
 	AppSubUrl                           string
 	GoogleAnalyticsId                   string
@@ -30,6 +30,9 @@ type IndexViewData struct {
 	Sentry                              *setting.Sentry
 	ContentDeliveryURL                  string
 	LoadingLogo                         template.URL
+	CSPContent                          string
+	CSPEnabled                          bool
+	IsDevelopmentEnv                    bool
 	// Nonce is a cryptographic identifier for use with Content Security Policy.
 	Nonce string
 }

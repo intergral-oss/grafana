@@ -31,7 +31,6 @@ export const richHistoryUpdatedAction = createAction<{ richHistoryResults: RichH
 );
 export const richHistoryStorageFullAction = createAction('explore/richHistoryStorageFullAction');
 export const richHistoryLimitExceededAction = createAction('explore/richHistoryLimitExceededAction');
-export const richHistoryMigrationFailedAction = createAction('explore/richHistoryMigrationFailedAction');
 
 export const richHistorySettingsUpdatedAction = createAction<RichHistorySettings>('explore/richHistorySettingsUpdated');
 export const richHistorySearchFiltersUpdatedAction = createAction<{
@@ -108,9 +107,11 @@ export const splitOpen = <T extends DataQuery = DataQuery>(options?: SplitOpenOp
     let rightUrlState: ExploreUrlState = leftUrlState;
 
     if (options) {
+      const { query, queries } = options;
+
       rightUrlState = {
         datasource: options.datasourceUid,
-        queries: [options.query],
+        queries: queries ?? (query ? [query] : []),
         range: options.range || leftState.range,
         panelsState: options.panelsState,
       };
@@ -173,7 +174,6 @@ export const initialExploreState: ExploreState = {
   correlations: undefined,
   richHistoryStorageFull: false,
   richHistoryLimitExceededWarningShown: false,
-  richHistoryMigrationFailed: false,
   largerExploreId: undefined,
   maxedExploreId: undefined,
   evenSplitPanes: true,
@@ -251,13 +251,6 @@ export const exploreReducer = (state = initialExploreState, action: AnyAction): 
     return {
       ...state,
       richHistoryLimitExceededWarningShown: true,
-    };
-  }
-
-  if (richHistoryMigrationFailedAction.match(action)) {
-    return {
-      ...state,
-      richHistoryMigrationFailed: true,
     };
   }
 

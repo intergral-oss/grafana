@@ -1,3 +1,5 @@
+import { isNumber, isString } from 'lodash';
+
 import { AppEvents, Field, LinkModel, PluginState, SelectableValue } from '@grafana/data';
 import { hasAlphaPanels } from 'app/core/config';
 
@@ -16,7 +18,7 @@ import { FrameState } from '../../../features/canvas/runtime/frame';
 import { Scene, SelectionParams } from '../../../features/canvas/runtime/scene';
 import { DimensionContext } from '../../../features/dimensions';
 
-import { AnchorPoint } from './types';
+import { AnchorPoint, ConnectionState } from './types';
 
 export function doSelect(scene: Scene, element: ElementState | FrameState) {
   try {
@@ -128,4 +130,55 @@ export function getDataLinks(ctx: DimensionContext, cfg: TextConfig, textData: s
   });
 
   return links;
+}
+
+export function isConnectionSource(element: ElementState) {
+  return element.options.connections && element.options.connections.length > 0;
+}
+export function isConnectionTarget(element: ElementState, sceneByName: Map<string, ElementState>) {
+  const connections = getConnections(sceneByName);
+  return connections.some((connection) => connection.target === element);
+}
+
+export function getConnections(sceneByName: Map<string, ElementState>) {
+  const connections: ConnectionState[] = [];
+  for (let v of sceneByName.values()) {
+    if (v.options.connections) {
+      v.options.connections.forEach((c, index) => {
+        // @TODO Remove after v10.x
+        if (isString(c.color)) {
+          c.color = { fixed: c.color };
+        }
+
+        if (isNumber(c.size)) {
+          c.size = { fixed: 2, min: 1, max: 10 };
+        }
+
+        const target = c.targetName ? sceneByName.get(c.targetName) : v.parent;
+        if (target) {
+          connections.push({
+            index,
+            source: v,
+            target,
+            info: c,
+          });
+        }
+      });
+    }
+  }
+
+  return connections;
+}
+
+export function getConnectionsByTarget(element: ElementState, scene: Scene) {
+  return scene.connections.state.filter((connection) => connection.target === element);
+}
+
+export function updateConnectionsForSource(element: ElementState, scene: Scene) {
+  const targetConnections = getConnectionsByTarget(element, scene);
+  targetConnections.forEach((connection) => {
+    const sourceConnections = connection.source.options.connections?.splice(0) ?? [];
+    const connections = sourceConnections.filter((con) => con.targetName !== element.getName());
+    connection.source.onChange({ ...connection.source.options, connections });
+  });
 }

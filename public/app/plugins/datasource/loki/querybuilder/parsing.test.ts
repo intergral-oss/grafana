@@ -76,6 +76,36 @@ describe('buildVisualQueryFromString', () => {
     );
   });
 
+  it('parses query with line filter and escaped quote', () => {
+    expect(buildVisualQueryFromString('{app="frontend"} |= "\\"line"')).toEqual(
+      noErrors({
+        labels: [
+          {
+            op: '=',
+            value: 'frontend',
+            label: 'app',
+          },
+        ],
+        operations: [{ id: LokiOperationId.LineContains, params: ['"line'] }],
+      })
+    );
+  });
+
+  it('parses query with label filter and escaped quote', () => {
+    expect(buildVisualQueryFromString('{app="frontend"} | bar="\\"baz"')).toEqual(
+      noErrors({
+        labels: [
+          {
+            op: '=',
+            value: 'frontend',
+            label: 'app',
+          },
+        ],
+        operations: [{ id: LokiOperationId.LabelFilter, params: ['bar', '=', '"baz'] }],
+      })
+    );
+  });
+
   it('returns error for query with ip matching line filter', () => {
     const context = buildVisualQueryFromString('{app="frontend"} |= ip("192.168.4.5/16") | logfmt');
     expect(context).toEqual(
@@ -141,7 +171,7 @@ describe('buildVisualQueryFromString', () => {
   });
 
   it('parses query with with unit label filter', () => {
-    expect(buildVisualQueryFromString('{app="frontend"} | bar < 8mb')).toEqual(
+    expect(buildVisualQueryFromString('{app="frontend"} | bar < 8m')).toEqual(
       noErrors({
         labels: [
           {
@@ -150,7 +180,7 @@ describe('buildVisualQueryFromString', () => {
             label: 'app',
           },
         ],
-        operations: [{ id: LokiOperationId.LabelFilter, params: ['bar', '<', '8mb'] }],
+        operations: [{ id: LokiOperationId.LabelFilter, params: ['bar', '<', '8m'] }],
       })
     );
   });

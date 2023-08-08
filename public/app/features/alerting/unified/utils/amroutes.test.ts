@@ -1,8 +1,8 @@
-import { Route } from 'app/plugins/datasource/alertmanager/types';
+import { MatcherOperator, Route } from 'app/plugins/datasource/alertmanager/types';
 
 import { FormAmRoute } from '../types/amroutes';
 
-import { amRouteToFormAmRoute, emptyRoute, formAmRouteToAmRoute } from './amroutes';
+import { amRouteToFormAmRoute, emptyRoute, formAmRouteToAmRoute, normalizeMatchers } from './amroutes';
 
 const emptyAmRoute: Route = {
   receiver: '',
@@ -34,10 +34,10 @@ describe('formAmRouteToAmRoute', () => {
       const route: FormAmRoute = buildFormAmRoute({ id: '1', overrideGrouping: false, groupBy: ['SHOULD NOT BE SET'] });
 
       // Act
-      const amRoute = formAmRouteToAmRoute('test', route, {});
+      const amRoute = formAmRouteToAmRoute('test', route, { id: 'root' });
 
       // Assert
-      expect(amRoute.group_by).toStrictEqual([]);
+      expect(amRoute.group_by).toStrictEqual(undefined);
     });
   });
 
@@ -47,7 +47,7 @@ describe('formAmRouteToAmRoute', () => {
       const route: FormAmRoute = buildFormAmRoute({ id: '1', overrideGrouping: true, groupBy: ['SHOULD BE SET'] });
 
       // Act
-      const amRoute = formAmRouteToAmRoute('test', route, {});
+      const amRoute = formAmRouteToAmRoute('test', route, { id: 'root' });
 
       // Assert
       expect(amRoute.group_by).toStrictEqual(['SHOULD BE SET']);
@@ -56,18 +56,13 @@ describe('formAmRouteToAmRoute', () => {
 });
 
 describe('amRouteToFormAmRoute', () => {
-  describe('when called with empty group_by', () => {
-    it.each`
-      group_by
-      ${[]}
-      ${null}
-      ${undefined}
-    `("when group_by is '$group_by', should set overrideGrouping false", ({ group_by }) => {
+  describe('when called with empty group_by array', () => {
+    it('should set overrideGrouping true and groupBy empty', () => {
       // Arrange
-      const amRoute: Route = buildAmRoute({ group_by: group_by });
+      const amRoute = buildAmRoute({ group_by: [] });
 
       // Act
-      const [formRoute] = amRouteToFormAmRoute(amRoute);
+      const formRoute = amRouteToFormAmRoute(amRoute);
 
       // Assert
       expect(formRoute.groupBy).toStrictEqual([]);
@@ -75,17 +70,60 @@ describe('amRouteToFormAmRoute', () => {
     });
   });
 
+  describe('when called with empty group_by', () => {
+    it.each`
+      group_by
+      ${null}
+      ${undefined}
+    `("when group_by is '$group_by', should set overrideGrouping false", ({ group_by }) => {
+      // Arrange
+      const amRoute = buildAmRoute({ group_by: group_by });
+
+      // Act
+      const formRoute = amRouteToFormAmRoute(amRoute);
+
+      // Assert
+      expect(formRoute.groupBy).toStrictEqual(undefined);
+      expect(formRoute.overrideGrouping).toBe(false);
+    });
+  });
+
   describe('when called with non-empty group_by', () => {
     it('Should set overrideGrouping true and groupBy', () => {
       // Arrange
-      const amRoute: Route = buildAmRoute({ group_by: ['SHOULD BE SET'] });
+      const amRoute = buildAmRoute({ group_by: ['SHOULD BE SET'] });
 
       // Act
-      const [formRoute] = amRouteToFormAmRoute(amRoute);
+      const formRoute = amRouteToFormAmRoute(amRoute);
 
       // Assert
       expect(formRoute.groupBy).toStrictEqual(['SHOULD BE SET']);
       expect(formRoute.overrideGrouping).toBe(true);
     });
+  });
+});
+
+describe('normalizeMatchers', () => {
+  const eq = MatcherOperator.equal;
+
+  it('should work for object_matchers', () => {
+    const route: Route = { object_matchers: [['foo', eq, 'bar']] };
+    expect(normalizeMatchers(route)).toEqual([['foo', eq, 'bar']]);
+  });
+  it('should work for matchers', () => {
+    const route: Route = { matchers: ['foo=bar', 'foo!=bar', 'foo=~bar', 'foo!~bar'] };
+    expect(normalizeMatchers(route)).toEqual([
+      ['foo', MatcherOperator.equal, 'bar'],
+      ['foo', MatcherOperator.notEqual, 'bar'],
+      ['foo', MatcherOperator.regex, 'bar'],
+      ['foo', MatcherOperator.notRegex, 'bar'],
+    ]);
+  });
+  it('should work for match and match_re', () => {
+    const route: Route = { match: { foo: 'bar' }, match_re: { foo: 'bar' } };
+    expect(normalizeMatchers(route)).toEqual([
+      ['foo', MatcherOperator.regex, 'bar'],
+      ['foo', MatcherOperator.equal, 'bar'],
+    ]);
   });
 });

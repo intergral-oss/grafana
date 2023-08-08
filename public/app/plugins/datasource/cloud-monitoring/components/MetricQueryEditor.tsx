@@ -15,6 +15,7 @@ import {
 
 import { GraphPeriod } from './GraphPeriod';
 import { MQLQueryEditor } from './MQLQueryEditor';
+import { Project } from './Project';
 import { VisualMetricQueryEditor } from './VisualMetricQueryEditor';
 
 export interface Props {
@@ -68,19 +69,24 @@ function Editor({
 
   useEffect(() => {
     if (query.queryType === QueryType.TIME_SERIES_LIST && !query.timeSeriesList) {
-      onChangeTimeSeriesList(defaultTimeSeriesList(datasource));
+      onQueryChange({
+        refId: query.refId,
+        datasource: query.datasource,
+        queryType: QueryType.TIME_SERIES_LIST,
+        intervalMs: query.intervalMs,
+        timeSeriesList: defaultTimeSeriesList(datasource),
+      });
     }
     if (query.queryType === QueryType.TIME_SERIES_QUERY && !query.timeSeriesQuery) {
-      onChangeTimeSeriesQuery(defaultTimeSeriesQuery(datasource));
+      onQueryChange({
+        refId: query.refId,
+        datasource: query.datasource,
+        queryType: QueryType.TIME_SERIES_QUERY,
+        intervalMs: query.intervalMs,
+        timeSeriesQuery: defaultTimeSeriesQuery(datasource),
+      });
     }
-  }, [
-    onChangeTimeSeriesList,
-    onChangeTimeSeriesQuery,
-    query.queryType,
-    query.timeSeriesList,
-    query.timeSeriesQuery,
-    datasource,
-  ]);
+  }, [onQueryChange, query, datasource]);
 
   return (
     <EditorRows>
@@ -99,6 +105,13 @@ function Editor({
 
       {query.queryType === QueryType.TIME_SERIES_QUERY && query.timeSeriesQuery && (
         <>
+          <Project
+            refId={refId}
+            datasource={datasource}
+            onChange={(projectName) => onChangeTimeSeriesQuery({ ...query.timeSeriesQuery!, projectName: projectName })}
+            templateVariableOptions={variableOptionGroup.options}
+            projectName={query.timeSeriesQuery.projectName!}
+          />
           <MQLQueryEditor
             onChange={(q: string) => onChangeTimeSeriesQuery({ ...query.timeSeriesQuery!, query: q })}
             onRunQuery={onRunQuery}
