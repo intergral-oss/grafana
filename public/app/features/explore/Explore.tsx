@@ -1,5 +1,5 @@
 import { css, cx } from '@emotion/css';
-import { get } from 'lodash';
+import { get, groupBy } from 'lodash';
 import memoizeOne from 'memoize-one';
 import React, { createRef } from 'react';
 import { connect, ConnectedProps } from 'react-redux';
@@ -40,6 +40,7 @@ import { ExploreId, ExploreItemState } from 'app/types/explore';
 
 import { getTimeZone } from '../profile/state/selectors';
 
+import { CustomContainer } from './CustomContainer';
 import ExploreQueryInspector from './ExploreQueryInspector';
 import { ExploreToolbar } from './ExploreToolbar';
 import { FlameGraphExploreContainer } from './FlameGraphExploreContainer';
@@ -286,6 +287,26 @@ export class Explore extends React.PureComponent<Props, ExploreState> {
     return <NoData />;
   }
 
+  renderCustom(width: number) {
+    const { timeZone, queryResponse, absoluteRange } = this.props;
+
+    const groupedByPlugin = groupBy(queryResponse?.customFrames, 'meta.preferredVisualisationPluginId');
+
+    return Object.entries(groupedByPlugin).map(([pluginId, frames], index) => {
+      return (
+        <CustomContainer
+          key={index}
+          timeZone={timeZone}
+          pluginId={pluginId}
+          frames={frames}
+          state={queryResponse.state}
+          absoluteRange={absoluteRange}
+          height={400}
+          width={width}
+        />
+      );
+    });
+  }
   renderCompactUrlWarning() {
     return (
       <FadeIn in={true} duration={100}>
@@ -436,6 +457,7 @@ export class Explore extends React.PureComponent<Props, ExploreState> {
       showTable,
       showRawPrometheus,
       showLogs,
+      showCustom,
       showTrace,
       showNodeGraph,
       showFlameGraph,
@@ -459,6 +481,7 @@ export class Explore extends React.PureComponent<Props, ExploreState> {
         queryResponse.tableFrames,
         queryResponse.rawPrometheusFrames,
         queryResponse.traceFrames,
+        queryResponse.customFrames,
       ].every((e) => e.length === 0);
 
     return (
@@ -513,6 +536,7 @@ export class Explore extends React.PureComponent<Props, ExploreState> {
                           {config.featureToggles.logsSampleInExplore && showLogsSample && (
                             <ErrorBoundaryAlert>{this.renderLogsSamplePanel()}</ErrorBoundaryAlert>
                           )}
+                          {showCustom && <ErrorBoundaryAlert>{this.renderCustom(width)}</ErrorBoundaryAlert>}
                           {showNoData && <ErrorBoundaryAlert>{this.renderNoData()}</ErrorBoundaryAlert>}
                         </>
                       )}
@@ -561,6 +585,7 @@ function mapStateToProps(state: StoreState, { exploreId }: ExploreProps) {
     showMetrics,
     showTable,
     showTrace,
+    showCustom,
     absoluteRange,
     queryResponse,
     showNodeGraph,
@@ -591,6 +616,7 @@ function mapStateToProps(state: StoreState, { exploreId }: ExploreProps) {
     showMetrics,
     showTable,
     showTrace,
+    showCustom,
     showNodeGraph,
     showRawPrometheus,
     showFlameGraph,
