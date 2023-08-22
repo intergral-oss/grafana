@@ -66,6 +66,7 @@ export class DatasourceSrv implements DataSourceService {
     scopedVars?: ScopedVars
   ): DataSourceInstanceSettings | undefined {
     let nameOrUid = getNameOrUid(ref);
+    console.log("nameOrUid: " + nameOrUid);
 
     // Expressions has a new UID as __expr__ See: https://github.com/grafana/grafana/pull/62510/
     // But we still have dashboards/panels with old expression UID (-100)
@@ -75,12 +76,14 @@ export class DatasourceSrv implements DataSourceService {
     }
 
     if (nameOrUid === 'default' || nameOrUid == null) {
+      console.log("nameOrUid is default or null")
       return this.settingsMapByUid[this.defaultName] ?? this.settingsMapByName[this.defaultName];
     }
 
     // Complex logic to support template variable data source names
     // For this we just pick the current or first data source in the variable
     if (nameOrUid[0] === '$') {
+      console.log("nameOrUid begins with $")
       const interpolatedName = this.templateSrv.replace(nameOrUid, scopedVars, variableInterpolation);
 
       let dsSettings;
@@ -90,8 +93,9 @@ export class DatasourceSrv implements DataSourceService {
       } else {
         dsSettings = this.settingsMapByUid[interpolatedName] ?? this.settingsMapByName[interpolatedName];
       }
-
+      console.log("dsSetting" +dsSettings)
       if (!dsSettings) {
+        console.log("undefined")
         return undefined;
       }
 
@@ -104,7 +108,7 @@ export class DatasourceSrv implements DataSourceService {
         rawRef: { type: dsSettings.type, uid: dsSettings.uid },
       };
     }
-
+    console.log("settingsmapbyuid" + this.settingsMapByUid[nameOrUid] ?? "settingsmapbyname" + this.settingsMapByName[nameOrUid])
     return this.settingsMapByUid[nameOrUid] ?? this.settingsMapByName[nameOrUid] ?? this.settingsMapById[nameOrUid];
   }
 
