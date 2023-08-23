@@ -21,7 +21,6 @@ import { CorrelationData } from '../../correlations/useCorrelations';
 import { attachCorrelationsToDataFrames } from '../../correlations/utils';
 import { sortLogsResult } from '../../logs/utils';
 import { hasPanelPlugin } from '../../plugins/importPanelPlugin';
-import { preProcessPanelData } from '../../query/state/runRequest';
 
 /**
  * When processing response first we try to determine what kind of dataframes we got as one query can return multiple
