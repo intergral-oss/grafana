@@ -21,7 +21,7 @@ export function AppChrome({ children }: Props) {
   const { chrome } = useGrafana();
   const state = chrome.useState();
 
-  const searchBarHidden = state.searchBarHidden || state.kioskMode === KioskMode.TV;
+  const searchBarHidden = state.searchBarHidden || state.kioskMode === KioskMode.TV || true;
 
   const contentClass = cx({
     [styles.content]: true,

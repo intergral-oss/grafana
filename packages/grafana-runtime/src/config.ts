@@ -59,6 +59,7 @@ export class GrafanaBootConfig implements GrafanaConfig {
   alertingMinInterval = 1;
   angularSupportEnabled = false;
   authProxyEnabled = false;
+  kioskMode = 'off';
   exploreEnabled = false;
   queryHistoryEnabled = false;
   helpEnabled = false;
